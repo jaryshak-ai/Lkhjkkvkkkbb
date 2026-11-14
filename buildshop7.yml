@@ -1,0 +1,1140 @@
+name: Build Shop
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Generate project files
+        run: |
+          set -e
+          mkdir -p src/main/java/shop src/main/resources
+          cat > pom.xml << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <project xmlns="http://maven.apache.org/POM/4.0.0"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+              <modelVersion>4.0.0</modelVersion>
+
+              <groupId>shop</groupId>
+              <artifactId>Shop</artifactId>
+              <version>1.2.2</version>
+              <packaging>jar</packaging>
+
+              <properties>
+                  <maven.compiler.source>17</maven.compiler.source>
+                  <maven.compiler.target>17</maven.compiler.target>
+                  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+              </properties>
+
+              <repositories>
+                  <repository>
+                      <id>lanink</id>
+                      <url>https://repo.lanink.cn/repository/maven-public/</url>
+                  </repository>
+              </repositories>
+
+              <dependencies>
+                  <dependency>
+                      <groupId>cn.nukkit</groupId>
+                      <artifactId>Nukkit</artifactId>
+                      <version>MOT-SNAPSHOT</version>
+                      <scope>provided</scope>
+                  </dependency>
+              </dependencies>
+
+              <build>
+                  <finalName>Shop-${project.version}</finalName>
+                  <plugins>
+                      <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-compiler-plugin</artifactId>
+                          <version>3.11.0</version>
+                          <configuration>
+                              <release>17</release>
+                              <encoding>UTF-8</encoding>
+                          </configuration>
+                      </plugin>
+                  </plugins>
+              </build>
+          </project>
+          EOF
+          cat > src/main/resources/plugin.yml << 'EOF'
+          name: Shop
+          main: shop.Shop
+          version: "1.2.2"
+          api: ["1.0.0"]
+          author: jaryshak
+          description: Системный магазин /shop - форма с категориями, меню-сундук с товарами и ползунок количества (только покупка за монеты TpCoins)
+          depend: [TpCoins]
+
+          commands:
+            shop:
+              description: Открыть магазин
+              usage: /shop
+              permission: shop.use
+            shopreload:
+              description: Перезагрузить shop.yml
+              usage: /shopreload
+              permission: shop.reload
+
+          permissions:
+            shop.use:
+              description: Пользоваться магазином
+              default: "true"
+            shop.reload:
+              description: Перезагружать shop.yml
+              default: op
+          EOF
+          cat > src/main/resources/shop.yml << 'EOF'
+          # Магазин /shop. buy = цена покупки (за 1 шт. или за пачку, если per > 1). Предметы без buy в магазин не попадают.
+          # Игроки магазину ничего продавать не могут.
+          # id - название предмета Nukkit (можно id:meta, напр. dye:4). Если предмет не найден - смотри консоль при старте или /shopreload.
+          # icon (необязательно) - путь к текстуре иконки категории в главном меню, напр. "textures/items/diamond".
+          #   Если не указан, иконка подбирается по названию категории.
+          categories:
+            - title: "Блоки"
+              items:
+                - {id: "log", name: "Дубовое бревно", buy: 10}
+                - {id: "planks", name: "Дубовые доски", buy: 3}
+                - {id: "glass", name: "Стекло", buy: 8}
+                - {id: "brick_block", name: "Кирпичи", buy: 12}
+                - {id: "clay_block", name: "Глина", buy: 8}
+                - {id: "wool", name: "Шерсть", buy: 10}
+                - {id: "obsidian", name: "Обсидиан", buy: 120}
+            - title: "Еда"
+              items:
+                - {id: "apple", name: "Яблоко", buy: 10}
+                - {id: "bread", name: "Хлеб", buy: 12}
+                - {id: "cooked_chicken", name: "Жареная курица", buy: 15}
+                - {id: "cooked_beef", name: "Стейк", buy: 20}
+                - {id: "pumpkin_pie", name: "Тыквенный пирог", buy: 18}
+                - {id: "golden_carrot", name: "Золотая морковь", buy: 25}
+                - {id: "golden_apple", name: "Золотое яблоко", buy: 150}
+            - title: "Ресурсы"
+              items:
+                - {id: "coal", name: "Уголь", buy: 15}
+                - {id: "copper_ingot", name: "Медный слиток", buy: 20}
+                - {id: "iron_ingot", name: "Железный слиток", buy: 40}
+                - {id: "gold_ingot", name: "Золотой слиток", buy: 80}
+                - {id: "redstone", name: "Красная пыль", buy: 10}
+                - {id: "dye:4", name: "Лазурит", buy: 12}
+                - {id: "emerald", name: "Изумруд", buy: 200}
+                - {id: "diamond", name: "Алмаз", buy: 300}
+                - {id: "netherite_ingot", name: "Незеритовый слиток", buy: 5000}
+            - title: "Инструменты и оружие"
+              items:
+                - {id: "iron_pickaxe", name: "Железная кирка", buy: 120}
+                - {id: "diamond_pickaxe", name: "Алмазная кирка", buy: 900}
+                - {id: "iron_sword", name: "Железный меч", buy: 100}
+                - {id: "diamond_sword", name: "Алмазный меч", buy: 800}
+                - {id: "netherite_sword", name: "Незеритовый меч", buy: 6000}
+                - {id: "bow", name: "Лук", buy: 60}
+                - {id: "arrow", name: "Стрелы (16 шт.)", buy: 40, per: 16}
+                - {id: "shield", name: "Щит", buy: 80}
+            - title: "Лёгкая броня"
+              items:
+                - {id: "leather_helmet", name: "Кожаный шлем", buy: 50}
+                - {id: "leather_chestplate", name: "Кожаный нагрудник", buy: 80}
+                - {id: "leather_leggings", name: "Кожаные поножи", buy: 70}
+                - {id: "leather_boots", name: "Кожаные ботинки", buy: 40}
+                - {id: "chainmail_helmet", name: "Кольчужный шлем", buy: 150}
+                - {id: "chainmail_chestplate", name: "Кольчужный нагрудник", buy: 240}
+                - {id: "chainmail_leggings", name: "Кольчужные поножи", buy: 210}
+                - {id: "chainmail_boots", name: "Кольчужные ботинки", buy: 120}
+                - {id: "turtle_helmet", name: "Панцирь черепахи", buy: 400}
+            - title: "Тяжёлая броня"
+              items:
+                - {id: "iron_helmet", name: "Железный шлем", buy: 200}
+                - {id: "iron_chestplate", name: "Железный нагрудник", buy: 320}
+                - {id: "iron_leggings", name: "Железные поножи", buy: 280}
+                - {id: "iron_boots", name: "Железные ботинки", buy: 160}
+                - {id: "diamond_helmet", name: "Алмазный шлем", buy: 1500}
+                - {id: "diamond_chestplate", name: "Алмазный нагрудник", buy: 2400}
+                - {id: "diamond_leggings", name: "Алмазные поножи", buy: 2100}
+                - {id: "diamond_boots", name: "Алмазные ботинки", buy: 1200}
+                - {id: "netherite_helmet", name: "Незеритовый шлем", buy: 6500}
+                - {id: "netherite_chestplate", name: "Незеритовый нагрудник", buy: 7400}
+                - {id: "netherite_leggings", name: "Незеритовые поножи", buy: 7100}
+                - {id: "netherite_boots", name: "Незеритовые ботинки", buy: 6200}
+            - title: "Разное"
+              items:
+                - {id: "torch", name: "Факелы (16 шт.)", buy: 15, per: 16}
+                - {id: "crafting_table", name: "Верстак", buy: 20}
+                - {id: "furnace", name: "Печь", buy: 25}
+                - {id: "chest", name: "Сундук", buy: 30}
+                - {id: "bed", name: "Кровать", buy: 60}
+                - {id: "bucket:8", name: "Ведро воды", buy: 30}
+                - {id: "piston", name: "Поршень", buy: 90}
+                - {id: "anvil", name: "Наковальня", buy: 400}
+                - {id: "experience_bottle", name: "Бутылочка опыта", buy: 100}
+                - {id: "ender_pearl", name: "Жемчуг Края", buy: 250}
+          EOF
+          cat > src/main/java/shop/Shop.java << 'EOF'
+          package shop;
+
+          import cn.nukkit.Player;
+          import cn.nukkit.block.Block;
+          import cn.nukkit.command.Command;
+          import cn.nukkit.command.CommandSender;
+          import cn.nukkit.event.EventHandler;
+          import cn.nukkit.event.EventPriority;
+          import cn.nukkit.event.Listener;
+          import cn.nukkit.event.inventory.InventoryCloseEvent;
+          import cn.nukkit.event.inventory.InventoryOpenEvent;
+          import cn.nukkit.event.inventory.InventoryTransactionEvent;
+          import cn.nukkit.event.player.PlayerFormRespondedEvent;
+          import cn.nukkit.event.player.PlayerQuitEvent;
+          import cn.nukkit.form.element.ElementButton;
+          import cn.nukkit.form.element.ElementButtonImageData;
+          import cn.nukkit.form.element.ElementLabel;
+          import cn.nukkit.form.element.ElementSlider;
+          import cn.nukkit.form.response.FormResponseCustom;
+          import cn.nukkit.form.response.FormResponseModal;
+          import cn.nukkit.form.response.FormResponseSimple;
+          import cn.nukkit.form.window.FormWindowCustom;
+          import cn.nukkit.form.window.FormWindowModal;
+          import cn.nukkit.form.window.FormWindowSimple;
+          import cn.nukkit.inventory.ContainerInventory;
+          import cn.nukkit.inventory.Inventory;
+          import cn.nukkit.inventory.InventoryHolder;
+          import cn.nukkit.inventory.InventoryType;
+          import cn.nukkit.inventory.PlayerInventory;
+          import cn.nukkit.inventory.transaction.action.InventoryAction;
+          import cn.nukkit.inventory.transaction.action.SlotChangeAction;
+          import cn.nukkit.item.Item;
+          import cn.nukkit.level.Level;
+          import cn.nukkit.math.Vector3;
+          import cn.nukkit.nbt.NBTIO;
+          import cn.nukkit.nbt.tag.CompoundTag;
+          import cn.nukkit.network.protocol.BlockEntityDataPacket;
+          import cn.nukkit.plugin.Plugin;
+          import cn.nukkit.plugin.PluginBase;
+          import cn.nukkit.scheduler.Task;
+          import cn.nukkit.utils.Config;
+
+          import java.io.File;
+          import java.lang.reflect.Method;
+          import java.nio.ByteOrder;
+          import java.util.ArrayList;
+          import java.util.HashMap;
+          import java.util.List;
+          import java.util.Locale;
+          import java.util.Map;
+          import java.util.UUID;
+          import java.util.concurrent.ConcurrentHashMap;
+
+          /**
+           * Системный магазин /shop: форма с категориями -> меню-сундук с товарами -> форма с ползунком количества (только покупка за монеты TpCoins).
+           * Сундук подставляется игроку пакетом (реального блока в мире нет), меню открывается с задержкой
+           * после отправки блока, а при закрытии настоящий блок на этом месте восстанавливается.
+           */
+          public class Shop extends PluginBase implements Listener {
+
+              private static final int V_CAT = 1;
+              private static final int MAX_QTY = 64;
+              private static final int F_MAIN = 0;
+              private static final int F_SLIDER = 1;
+              private static final int F_MODAL = 2;
+              private static final int PAGE = 18;
+              private static final int INV_SLOTS = 36;
+              private static final String TITLE = "§lМагазин";
+
+              static final class Entry {
+                  String id;
+                  String name;
+                  long buy = -1;
+                  int per = 1;
+                  Item ref;
+              }
+
+              static final class Category {
+                  String title;
+                  String icon;
+                  List<Entry> items = new ArrayList<>();
+              }
+
+              /** Холдер фейкового сундука: просто точка, откуда клиент берёт позицию контейнера. */
+              static final class Holder extends Vector3 implements InventoryHolder {
+                  Inventory inv;
+
+                  Holder(int x, int y, int z) {
+                      super(x, y, z);
+                  }
+
+                  @Override
+                  public Inventory getInventory() {
+                      return inv;
+                  }
+              }
+
+              static final class Menu extends ContainerInventory {
+                  Menu(Holder holder) {
+                      super(holder, InventoryType.CHEST);
+                      holder.inv = this;
+                  }
+              }
+
+              static final class Session {
+                  final Player player;
+                  final Level level;
+                  final int x;
+                  final int y;
+                  final int z;
+                  final long created = System.currentTimeMillis();
+                  Menu inv;
+                  boolean open;
+                  int view = V_CAT;
+                  int cat;
+                  int mainPage;
+                  int catPage;
+                  Entry entry;
+                  long last;
+                  Map<Integer, String> actions = new HashMap<>();
+
+                  Session(Player player, Level level, int x, int y, int z) {
+                      this.player = player;
+                      this.level = level;
+                      this.x = x;
+                      this.y = y;
+                      this.z = z;
+                  }
+              }
+
+              /** Открытая у игрока форма: что за форма и к чему она относится. */
+              static final class PendingForm {
+                  final int type;
+                  final int cat;
+                  final Entry entry;
+                  final int max;
+                  int id;
+
+                  PendingForm(int type, int cat, Entry entry, int max) {
+                      this.type = type;
+                      this.cat = cat;
+                      this.entry = entry;
+                      this.max = max;
+                  }
+              }
+
+              /** Экономика TpCoins через рефлексию: getEconomy() -> getBalance/getRoom/deposit/withdraw. */
+              static final class Eco {
+                  final Object obj;
+                  final Method mBalance;
+                  final Method mRoom;
+                  final Method mDeposit;
+                  final Method mWithdraw;
+
+                  Eco(Plugin tp) throws Exception {
+                      obj = tp.getClass().getMethod("getEconomy").invoke(tp);
+                      Class<?> c = obj.getClass();
+                      mBalance = c.getMethod("getBalance", String.class);
+                      mRoom = c.getMethod("getRoom", String.class);
+                      mDeposit = c.getMethod("deposit", String.class, Long.TYPE, String.class);
+                      mWithdraw = c.getMethod("withdraw", String.class, Long.TYPE, String.class);
+                  }
+
+                  long balance(String key) throws Exception {
+                      return ((Number) mBalance.invoke(obj, key)).longValue();
+                  }
+
+                  long room(String key) throws Exception {
+                      return ((Number) mRoom.invoke(obj, key)).longValue();
+                  }
+
+                  String deposit(String key, long amount, String reason) throws Exception {
+                      return String.valueOf(mDeposit.invoke(obj, key, amount, reason));
+                  }
+
+                  String withdraw(String key, long amount, String reason) throws Exception {
+                      return String.valueOf(mWithdraw.invoke(obj, key, amount, reason));
+                  }
+              }
+
+              private volatile List<Category> categories = new ArrayList<>();
+              private final Map<UUID, PendingForm> forms = new ConcurrentHashMap<>();
+              private final Map<UUID, Session> sessions = new ConcurrentHashMap<>();
+              private Eco eco;
+
+              // ------------------------------------------------------------------ жизненный цикл
+
+              @Override
+              public void onEnable() {
+                  saveResource("shop.yml");
+                  Plugin tp = getServer().getPluginManager().getPlugin("TpCoins");
+                  if (tp == null) {
+                      getLogger().error("TpCoins не найден - магазин отключён.");
+                      getServer().getPluginManager().disablePlugin(this);
+                      return;
+                  }
+                  try {
+                      eco = new Eco(tp);
+                  } catch (Exception e) {
+                      getLogger().error("Не удалось подключиться к экономике TpCoins: " + e, e);
+                      getServer().getPluginManager().disablePlugin(this);
+                      return;
+                  }
+                  getServer().getPluginManager().registerEvents(this, this);
+                  int[] r = loadShop();
+                  getLogger().info("Магазин загружен: категорий " + r[0] + ", предметов " + r[1] + ".");
+              }
+
+              @Override
+              public void onDisable() {
+                  closeAll();
+              }
+
+              private void closeAll() {
+                  for (Session s : new ArrayList<>(sessions.values())) {
+                      try {
+                          if (s.inv != null && s.player.isOnline()) {
+                              s.player.removeWindow(s.inv);
+                          }
+                      } catch (Exception ignored) {
+                          // игрок мог уже выйти
+                      }
+                      cleanup(s);
+                  }
+                  forms.clear();
+              }
+
+              private int[] loadShop() {
+                  List<Category> loaded = new ArrayList<>();
+                  int itemsTotal = 0;
+                  Config cfg = new Config(new File(getDataFolder(), "shop.yml"), Config.YAML);
+                  List<?> raw = cfg.getList("categories");
+                  if (raw == null || raw.isEmpty()) {
+                      getLogger().warning("shop.yml: нет списка categories.");
+                  } else {
+                      for (Object co : raw) {
+                          if (!(co instanceof Map)) {
+                              continue;
+                          }
+                          Map<?, ?> cm = (Map<?, ?>) co;
+                          Category c = new Category();
+                          c.title = str(cm.get("title"), "Категория");
+                          c.icon = cm.get("icon") == null ? defaultIcon(c.title) : str(cm.get("icon"), "");
+                          Object io = cm.get("items");
+                          if (io instanceof List) {
+                              for (Object eo : (List<?>) io) {
+                                  if (!(eo instanceof Map)) {
+                                      continue;
+                                  }
+                                  Map<?, ?> em = (Map<?, ?>) eo;
+                                  Entry e = new Entry();
+                                  e.id = str(em.get("id"), "");
+                                  e.name = str(em.get("name"), e.id);
+                                  e.buy = num(em.get("buy"), -1);
+                                  e.per = (int) Math.max(1, num(em.get("per"), 1));
+                                  String baseId = e.id.toLowerCase(Locale.ROOT).split(":")[0];
+                                  if (baseId.equals("cobblestone") || baseId.equals("stone") || baseId.equals("sand") || baseId.equals("gravel")) {
+                                      continue; // в магазине не продаются
+                                  }
+                                  if (e.buy < 0) {
+                                      getLogger().info("shop.yml: \"" + e.id + "\" пропущен - нет цены покупки (продажа игроками отключена).");
+                                      continue;
+                                  }
+                                  Item it = null;
+                                  try {
+                                      it = e.id.isEmpty() ? null : Item.fromString(e.id);
+                                  } catch (Exception ignored) {
+                                      // предмет не распознан
+                                  }
+                                  if (it == null || it.getId() == 0) {
+                                      getLogger().warning("shop.yml: предмет не найден: \"" + e.id + "\" (" + e.name + ") - пропущен.");
+                                      continue;
+                                  }
+                                  it.setCount(1);
+                                  e.ref = it;
+                                  c.items.add(e);
+                                  itemsTotal++;
+                              }
+                          }
+                          if (!c.items.isEmpty()) {
+                              loaded.add(c);
+                          }
+                      }
+                  }
+                  categories = loaded;
+                  return new int[]{loaded.size(), itemsTotal};
+              }
+
+              /** Иконка категории (путь к текстуре клиента), если в shop.yml не задан icon. */
+              private static String defaultIcon(String title) {
+                  String t = title.toLowerCase(Locale.ROOT);
+                  if (t.contains("блок")) {
+                      return "textures/blocks/grass_side_carried";
+                  }
+                  if (t.contains("еда") || t.contains("food")) {
+                      return "textures/items/apple";
+                  }
+                  if (t.contains("ресурс")) {
+                      return "textures/items/diamond";
+                  }
+                  if (t.contains("инструмент") || t.contains("оруж") || t.contains("меч")) {
+                      return "textures/items/diamond_sword";
+                  }
+                  if (t.contains("лёгк") || t.contains("легк")) {
+                      return "textures/items/leather_chestplate";
+                  }
+                  if (t.contains("тяжёл") || t.contains("тяжел") || t.contains("брон")) {
+                      return "textures/items/diamond_chestplate";
+                  }
+                  if (t.contains("книг")) {
+                      return "textures/items/book_enchanted";
+                  }
+                  if (t.contains("дальн") || t.contains("лук")) {
+                      return "textures/items/bow_standby";
+                  }
+                  if (t.contains("колб") || t.contains("опыт")) {
+                      return "textures/items/experience_bottle";
+                  }
+                  return "textures/items/ender_pearl";
+              }
+
+              private static String str(Object o, String def) {
+                  return o == null ? def : String.valueOf(o);
+              }
+
+              private static long num(Object o, long def) {
+                  return o instanceof Number ? ((Number) o).longValue() : def;
+              }
+
+              // ------------------------------------------------------------------ команды
+
+              @Override
+              public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+                  String n = command.getName();
+                  if (n.equalsIgnoreCase("shop")) {
+                      if (!(sender instanceof Player)) {
+                          sender.sendMessage("Эта команда только для игроков.");
+                          return true;
+                      }
+                      showMainForm((Player) sender);
+                      return true;
+                  }
+                  if (n.equalsIgnoreCase("shopreload")) {
+                      closeAll();
+                      int[] r = loadShop();
+                      sender.sendMessage("§aМагазин перезагружен: категорий " + r[0] + ", предметов " + r[1] + ".");
+                      return true;
+                  }
+                  return false;
+              }
+
+              // ------------------------------------------------------------------ открытие / закрытие
+
+              private void openCategory(Player p, int ci) {
+                  if (!p.isOnline()) {
+                      return;
+                  }
+                  if (categories.isEmpty() || ci < 0 || ci >= categories.size()) {
+                      p.sendMessage("§cМагазин пуст.");
+                      return;
+                  }
+                  UUID id = p.getUniqueId();
+                  Session old = sessions.get(id);
+                  if (old != null) {
+                      boolean alive = old.open && old.inv != null && p.getWindowId(old.inv) >= 0;
+                      boolean pending = !old.open && System.currentTimeMillis() - old.created < 2000;
+                      if (alive) {
+                          old.view = V_CAT;
+                          old.cat = ci;
+                          old.catPage = 0;
+                          render(old);
+                          return;
+                      }
+                      if (pending) {
+                          return;
+                      }
+                      cleanup(old); // зависшая сессия - убираем и открываем заново
+                  }
+                  Level lv = p.getLevel();
+                  int x = p.getFloorX();
+                  int z = p.getFloorZ();
+                  int y = p.getFloorY() + 3;
+                  if (y > 250) {
+                      y = Math.max(1, p.getFloorY() - 3);
+                  }
+                  Session s = new Session(p, lv, x, y, z);
+                  s.cat = ci;
+                  s.view = V_CAT;
+                  sessions.put(id, s);
+                  try {
+                      sendFake(p, lv, x, y, z);
+                  } catch (Exception e) {
+                      err(p, "подготовка меню (sendFake)", e);
+                      sessions.remove(id, s);
+                      p.sendMessage("§cОшибка магазина. Сообщи администратору.");
+                      return;
+                  }
+                  // даём клиенту время принять блок сундука, и только потом открываем окно
+                  later(10, () -> finishOpen(s));
+              }
+
+              /** Ошибки только в консоль сервера, игрокам (в том числе операторам) ничего не показывается. */
+              private void err(Player p, String where, Throwable e) {
+                  getLogger().error("[ОШИБКА] " + where + " (" + p.getName() + "): " + e, e);
+              }
+
+              private void dbg(Player p, String msg) {
+                  getLogger().info("[debug] " + p.getName() + ": " + msg);
+              }
+
+              private void finishOpen(Session s) {
+                  Player p = s.player;
+                  if (sessions.get(p.getUniqueId()) != s) {
+                      getLogger().info("[debug] finishOpen: сессия уже сброшена");
+                      return;
+                  }
+                  dbg(p, "finishOpen дошёл, окно открываю");
+                  if (!p.isOnline() || p.getLevel() != s.level) {
+                      cleanup(s);
+                      return;
+                  }
+                  try {
+                      Menu m = new Menu(new Holder(s.x, s.y, s.z));
+                      s.inv = m;
+                      render(s);
+                      int wid = p.addWindow(m);
+                      dbg(p, "addWindow вернул " + wid);
+                      if (wid < 0) {
+                          cleanup(s);
+                          p.sendMessage("§cНе удалось открыть магазин, попробуй ещё раз.");
+                          return;
+                      }
+                      s.open = true;
+                      // сторож: через секунду проверяем, что окно живо на сервере
+                      later(20, () -> {
+                          if (sessions.get(p.getUniqueId()) == s) {
+                              dbg(p, "через 1 с: окно на сервере " + (p.getWindowId(m) >= 0 ? "ЕСТЬ (id " + p.getWindowId(m) + ")" : "НЕТ")
+                                      + ", игрок в мире: " + p.getLevel().getName()
+                                      + ", расстояние до сундука: " + Math.round(p.distance(new Vector3(s.x, s.y, s.z))));
+                          }
+                      });
+                  } catch (Exception e) {
+                      err(p, "открытие окна (finishOpen)", e);
+                      cleanup(s);
+                      p.sendMessage("§cОшибка магазина. Сообщи администратору.");
+                  }
+              }
+
+              private void sendFake(Player p, Level lv, int x, int y, int z) throws Exception {
+                  Block b = Block.get(Block.CHEST, 2);
+                  dbg(p, "фейк-сундук: id=" + b.getId() + " meta=" + b.getDamage() + " поз=" + x + "," + y + "," + z + " игрок=" + p.getFloorX() + "," + p.getFloorY() + "," + p.getFloorZ());
+                  b.x = x;
+                  b.y = y;
+                  b.z = z;
+                  b.level = lv;
+                  lv.sendBlocks(new Player[]{p}, new Vector3[]{b});
+
+                  CompoundTag tag = new CompoundTag()
+                          .putString("id", "Chest")
+                          .putInt("x", x)
+                          .putInt("y", y)
+                          .putInt("z", z)
+                          .putString("CustomName", TITLE);
+                  BlockEntityDataPacket pk = new BlockEntityDataPacket();
+                  pk.x = x;
+                  pk.y = y;
+                  pk.z = z;
+                  pk.namedTag = NBTIO.write(tag, ByteOrder.LITTLE_ENDIAN, true);
+                  p.dataPacket(pk);
+              }
+
+              private void restoreBlock(Session s) {
+                  try {
+                      if (s.player.isOnline() && s.player.getLevel() == s.level) {
+                          s.level.sendBlocks(new Player[]{s.player}, new Vector3[]{new Vector3(s.x, s.y, s.z)});
+                      }
+                  } catch (Exception ignored) {
+                      // игрок мог выйти
+                  }
+              }
+
+              /** Идемпотентная уборка сессии: убирает запись и возвращает настоящий блок. */
+              private void cleanup(Session s) {
+                  if (!sessions.remove(s.player.getUniqueId(), s)) {
+                      return;
+                  }
+                  s.open = false;
+                  restoreBlock(s);
+              }
+
+              private void later(int ticks, Runnable r) {
+                  getServer().getScheduler().scheduleDelayedTask(new Task() {
+                      @Override
+                      public void onRun(int currentTick) {
+                          r.run();
+                      }
+                  }, ticks);
+              }
+
+              @EventHandler(priority = EventPriority.MONITOR)
+              public void onOpenEvent(InventoryOpenEvent e) {
+                  Session s = sessions.get(e.getPlayer().getUniqueId());
+                  if (s != null && s.inv != null && s.inv == e.getInventory()) {
+                      dbg(e.getPlayer(), "InventoryOpenEvent, отменён другим плагином: " + e.isCancelled());
+                  }
+              }
+
+              @EventHandler
+              public void onClose(InventoryCloseEvent e) {
+                  Session s = sessions.get(e.getPlayer().getUniqueId());
+                  if (s != null && s.inv != null && s.inv == e.getInventory()) {
+                      dbg(e.getPlayer(), "окно закрыто (InventoryCloseEvent), через " + (System.currentTimeMillis() - s.created) + " мс после /shop");
+                      cleanup(s);
+                  }
+              }
+
+              @EventHandler
+              public void onQuit(PlayerQuitEvent e) {
+                  sessions.remove(e.getPlayer().getUniqueId());
+                  forms.remove(e.getPlayer().getUniqueId());
+              }
+
+              // ------------------------------------------------------------------ клики
+
+              @EventHandler(priority = EventPriority.HIGHEST)
+              public void onTransaction(InventoryTransactionEvent e) {
+                  Player p = e.getTransaction().getSource();
+                  Session s = sessions.get(p.getUniqueId());
+                  if (s == null || s.inv == null) {
+                      return;
+                  }
+                  boolean ours = false;
+                  int slot = -1;
+                  for (InventoryAction a : e.getTransaction().getActions()) {
+                      if (a instanceof SlotChangeAction) {
+                          SlotChangeAction sa = (SlotChangeAction) a;
+                          if (sa.getInventory() == s.inv) {
+                              ours = true;
+                              if (slot < 0) {
+                                  slot = sa.getSlot();
+                              }
+                          }
+                      }
+                  }
+                  if (!ours) {
+                      return;
+                  }
+                  e.setCancelled(true); // из меню нельзя ничего забрать или положить
+                  final int clicked = slot;
+                  later(1, () -> {
+                      handleClick(s, clicked);
+                      resync(s);
+                  });
+              }
+
+              private void resync(Session s) {
+                  try {
+                      if (sessions.get(s.player.getUniqueId()) == s && s.inv != null && s.player.isOnline()) {
+                          s.inv.sendContents(s.player);
+                          s.player.getInventory().sendContents(s.player);
+                      }
+                  } catch (Exception ignored) {
+                      // не критично
+                  }
+              }
+
+              private void handleClick(Session s, int slot) {
+                  if (sessions.get(s.player.getUniqueId()) != s || !s.open || slot < 0) {
+                      return;
+                  }
+                  String a = s.actions.get(slot);
+                  if (a == null) {
+                      return;
+                  }
+                  long now = System.currentTimeMillis();
+                  if (now - s.last < 200) {
+                      return;
+                  }
+                  s.last = now;
+
+                  final Player p = s.player;
+                  List<Category> cats = categories;
+                  try {
+                      if (a.startsWith("item:")) {
+                          int ii = Integer.parseInt(a.substring(5));
+                          Category c = s.cat < cats.size() ? cats.get(s.cat) : null;
+                          if (c != null && ii >= 0 && ii < c.items.size()) {
+                              final int ci = s.cat;
+                              final Entry en = c.items.get(ii);
+                              closeChest(s);
+                              later(6, () -> showQuantityForm(p, ci, en));
+                          }
+                          return;
+                      }
+                      if (a.equals("back")) {
+                          closeChest(s);
+                          later(6, () -> showMainForm(p));
+                          return;
+                      }
+                      if (a.equals("prev") || a.equals("next")) {
+                          s.catPage += a.equals("next") ? 1 : -1;
+                      }
+                  } catch (Exception ex) {
+                      err(p, "клик в меню", ex);
+                      p.sendMessage("§cОшибка магазина. Сообщи администратору.");
+                  }
+                  render(s);
+              }
+
+              /** Закрыть сундук-меню у игрока и убрать сессию. */
+              private void closeChest(Session s) {
+                  try {
+                      if (s.inv != null && s.player.isOnline()) {
+                          s.player.removeWindow(s.inv);
+                      }
+                  } catch (Exception ignored) {
+                      // игрок мог выйти
+                  }
+                  cleanup(s);
+              }
+
+              // ------------------------------------------------------------------ формы
+
+              /** Главная форма: категории с иконками. */
+              private void showMainForm(Player p) {
+                  if (!p.isOnline()) {
+                      return;
+                  }
+                  List<Category> cats = categories;
+                  if (cats.isEmpty()) {
+                      p.sendMessage("§cМагазин пуст.");
+                      return;
+                  }
+                  Session old = sessions.get(p.getUniqueId());
+                  if (old != null) {
+                      closeChest(old);
+                  }
+                  try {
+                      FormWindowSimple f = new FormWindowSimple("§l§6Магазин",
+                              "§eБаланс: §f" + safeBalance(p) + " монет\n§7Выбери категорию:");
+                      for (Category c : cats) {
+                          String text = "§l§6" + c.title + "§r\n§7Товаров: §f" + c.items.size();
+                          if (c.icon != null && !c.icon.isEmpty()) {
+                              f.addButton(new ElementButton(text,
+                                      new ElementButtonImageData(ElementButtonImageData.IMAGE_DATA_TYPE_PATH, c.icon)));
+                          } else {
+                              f.addButton(new ElementButton(text));
+                          }
+                      }
+                      PendingForm pf = new PendingForm(F_MAIN, 0, null, 0);
+                      pf.id = p.showFormWindow(f);
+                      forms.put(p.getUniqueId(), pf);
+                  } catch (Exception e) {
+                      err(p, "главная форма (showMainForm)", e);
+                      p.sendMessage("§cОшибка магазина. Сообщи администратору.");
+                  }
+              }
+
+              /** Форма покупки: ползунок количества (или подтверждение, если можно купить только одну пачку). */
+              private void showQuantityForm(Player p, int ci, Entry e) {
+                  if (!p.isOnline()) {
+                      return;
+                  }
+                  try {
+                      long bal = safeBalance(p);
+                      long capPacks = capacity(p.getInventory(), e.ref) / e.per;
+                      long affordable = e.buy == 0 ? MAX_QTY : bal / e.buy;
+                      int max = (int) Math.min(MAX_QTY, Math.min(capPacks, affordable));
+                      if (max < 1) {
+                          if (affordable < 1) {
+                              p.sendMessage("§cНедостаточно монет. Нужно: " + e.buy + ", у тебя: " + bal + ".");
+                          } else {
+                              p.sendMessage("§cНедостаточно места в инвентаре.");
+                          }
+                          later(2, () -> openCategory(p, ci));
+                          return;
+                      }
+                      String info = "§f" + e.name + "\n§7Цена: §a" + e.buy + " монет §7за " + qty(e, 1)
+                              + "\n§7Баланс: §e" + bal + " монет\n§7Можно купить максимум: §f" + max;
+                      PendingForm pf;
+                      if (max == 1) {
+                          FormWindowModal f = new FormWindowModal("§l§6Покупка",
+                                  info + "\n\n§fКупить за §e" + e.buy + " монет§f?", "§aКупить", "§cНазад");
+                          pf = new PendingForm(F_MODAL, ci, e, max);
+                          pf.id = p.showFormWindow(f);
+                      } else {
+                          FormWindowCustom f = new FormWindowCustom("§l§6Покупка");
+                          f.addElement(new ElementLabel(info));
+                          f.addElement(new ElementSlider("§fКоличество" + (e.per > 1 ? " (пачек по " + e.per + " шт.)" : " (шт.)"),
+                                  1, max, 1, 1));
+                          pf = new PendingForm(F_SLIDER, ci, e, max);
+                          pf.id = p.showFormWindow(f);
+                      }
+                      forms.put(p.getUniqueId(), pf);
+                  } catch (Exception ex) {
+                      err(p, "форма покупки (showQuantityForm)", ex);
+                      p.sendMessage("§cОшибка магазина. Сообщи администратору.");
+                  }
+              }
+
+              @EventHandler
+              public void onForm(PlayerFormRespondedEvent e) {
+                  final Player p = e.getPlayer();
+                  PendingForm pf = forms.get(p.getUniqueId());
+                  if (pf == null || pf.id != e.getFormID()) {
+                      return;
+                  }
+                  forms.remove(p.getUniqueId());
+                  final int cat = pf.cat;
+                  try {
+                      if (e.wasClosed() || e.getResponse() == null) {
+                          if (pf.type != F_MAIN) {
+                              later(2, () -> openCategory(p, cat)); // закрыл форму покупки - назад к товарам
+                          }
+                          return;
+                      }
+                      if (pf.type == F_MAIN) {
+                          int ci = ((FormResponseSimple) e.getResponse()).getClickedButtonId();
+                          openCategory(p, ci);
+                          return;
+                      }
+                      int packs;
+                      if (pf.type == F_SLIDER) {
+                          float v = ((FormResponseCustom) e.getResponse()).getSliderResponse(1);
+                          packs = Math.round(v);
+                      } else {
+                          if (((FormResponseModal) e.getResponse()).getClickedButtonId() != 0) {
+                              later(2, () -> openCategory(p, cat));
+                              return;
+                          }
+                          packs = 1;
+                      }
+                      packs = Math.max(1, Math.min(packs, pf.max));
+                      String msg = doBuy(p, pf.entry, packs);
+                      p.sendMessage(msg);
+                      later(2, () -> openCategory(p, cat));
+                  } catch (Exception ex) {
+                      err(p, "обработка формы (onForm)", ex);
+                      p.sendMessage("§cОшибка магазина. Сообщи администратору.");
+                  }
+              }
+
+              // ------------------------------------------------------------------ отрисовка меню
+
+              private static int pages(int total) {
+                  return total <= PAGE ? 1 : (total + PAGE - 1) / PAGE;
+              }
+
+              private static int clampPage(int page, int total) {
+                  return Math.max(0, Math.min(page, pages(total) - 1));
+              }
+
+              private static int fromIndex(int total, int page) {
+                  return total <= PAGE ? 0 : page * PAGE;
+              }
+
+              /** Слоты для элементов страницы: до 7 штук - по центру второго ряда, больше - подряд с нулевого слота. */
+              private static int[] layout(int total, int page) {
+                  if (total <= 7) {
+                      int start = 9 + (9 - total) / 2;
+                      int[] r = new int[total];
+                      for (int i = 0; i < total; i++) {
+                          r[i] = start + i;
+                      }
+                      return r;
+                  }
+                  int cnt = Math.min(PAGE, total - fromIndex(total, page));
+                  int[] r = new int[cnt];
+                  for (int i = 0; i < cnt; i++) {
+                      r[i] = i;
+                  }
+                  return r;
+              }
+
+              private void render(Session s) {
+                  if (s.inv == null) {
+                      return;
+                  }
+                  try {
+                      Map<Integer, Item> m = new HashMap<>();
+                      Map<Integer, String> act = new HashMap<>();
+                      List<Category> cats = categories;
+                      if (cats.isEmpty()) {
+                          return;
+                      }
+                      if (s.cat >= cats.size()) {
+                          s.cat = 0;
+                      }
+                      long bal = safeBalance(s.player);
+
+                      renderCategory(s, cats.get(s.cat), m, act);
+
+                      m.put(26, ui(mk("gold_nugget", "gold_ingot"), 1, "§eБаланс: §f" + bal + " монет"));
+
+                      s.actions = act;
+                      s.inv.setContents(m);
+                  } catch (Exception e) {
+                      err(s.player, "отрисовка меню (render)", e);
+                  }
+              }
+
+              private void renderCategory(Session s, Category c, Map<Integer, Item> m, Map<Integer, String> act) {
+                  int total = c.items.size();
+                  s.catPage = clampPage(s.catPage, total);
+                  int from = fromIndex(total, s.catPage);
+                  int[] slots = layout(total, s.catPage);
+                  for (int i = 0; i < slots.length; i++) {
+                      Entry e = c.items.get(from + i);
+                      List<String> lore = new ArrayList<>();
+                      lore.add(priceLine(e));
+                      lore.add("§8Нажми, чтобы купить");
+                      m.put(slots[i], ui(e.ref.clone(), 1, "§f" + e.name, lore.toArray(new String[0])));
+                      act.put(slots[i], "item:" + (from + i));
+                  }
+                  navigation(total, s.catPage, m, act, true);
+              }
+
+              private void navigation(int total, int page, Map<Integer, Item> m, Map<Integer, String> act, boolean withBack) {
+                  if (withBack) {
+                      m.put(22, ui(mk("barrier", "arrow"), 1, "§cНазад"));
+                      act.put(22, "back");
+                  }
+                  int pg = pages(total);
+                  if (pg > 1) {
+                      if (page > 0) {
+                          m.put(21, ui(mk("arrow", "paper"), 1, "§e« Предыдущая страница", "§7Страница " + (page + 1) + " из " + pg));
+                          act.put(21, "prev");
+                      }
+                      if (page < pg - 1) {
+                          m.put(23, ui(mk("arrow", "paper"), 1, "§eСледующая страница »", "§7Страница " + (page + 1) + " из " + pg));
+                          act.put(23, "next");
+                      }
+                  }
+              }
+
+              private static String qty(Entry e, int a) {
+                  return e.per == 1 ? a + " шт." : a + " x " + e.per + " шт.";
+              }
+
+              private static String priceLine(Entry e) {
+                  return "§7Цена: §a" + e.buy + " монет" + (e.per > 1 ? " §7за §f" + e.per + " шт." : "");
+              }
+
+              private static Item ui(Item base, int count, String name, String... lore) {
+                  Item r = base.clone();
+                  r.setCount(Math.max(1, count));
+                  r.setCustomName(name);
+                  if (lore != null && lore.length > 0) {
+                      r.setLore(lore);
+                  }
+                  return r;
+              }
+
+              /** Предмет-кнопка по имени; если имя не распознано - запасной, а в крайнем случае бумага. */
+              private static Item mk(String id, String fallback) {
+                  Item it = safeItem(id);
+                  if (it == null) {
+                      it = safeItem(fallback);
+                  }
+                  if (it == null) {
+                      it = Item.get(Item.PAPER);
+                  }
+                  return it;
+              }
+
+              private static Item safeItem(String id) {
+                  try {
+                      Item it = Item.fromString(id);
+                      return it == null || it.getId() == 0 ? null : it;
+                  } catch (Exception e) {
+                      return null;
+                  }
+              }
+
+              // ------------------------------------------------------------------ экономика и инвентарь
+
+              private String key(Player p) {
+                  return p.getName().trim().toLowerCase(Locale.ROOT).replace(' ', '_');
+              }
+
+              private long safeBalance(Player p) {
+                  try {
+                      return eco.balance(key(p));
+                  } catch (Exception e) {
+                      return 0;
+                  }
+              }
+
+              private String doBuy(Player p, Entry e, int packs) throws Exception {
+                  if (e.buy < 0) {
+                      return "§cЭтот предмет нельзя купить.";
+                  }
+                  long total = e.buy * packs;
+                  long items = (long) e.per * packs;
+                  PlayerInventory inv = p.getInventory();
+                  if (capacity(inv, e.ref) < items) {
+                      return "§cНедостаточно места в инвентаре.";
+                  }
+                  String key = key(p);
+                  if (total > 0) {
+                      if (eco.balance(key) < total) {
+                          return "§cНедостаточно монет. Нужно: " + total + ".";
+                      }
+                      String r = eco.withdraw(key, total, "shop buy " + e.id + " x" + items);
+                      if ("NOT_ENOUGH".equals(r)) {
+                          return "§cНедостаточно монет. Нужно: " + total + ".";
+                      }
+                      if (!"OK".equals(r)) {
+                          return "§cОшибка оплаты: " + r;
+                      }
+                  }
+                  give(p, e.ref, (int) items);
+                  return "§aКуплено: " + e.name + " x" + items + " за " + total + " монет.";
+              }
+
+              /** Выдать предметы; то, что не влезло, падает под ноги. */
+              private void give(Player p, Item ref, int count) {
+                  Item it = ref.clone();
+                  it.setCount(count);
+                  Item[] left = p.getInventory().addItem(it);
+                  if (left != null) {
+                      for (Item l : left) {
+                          if (l != null && !l.isNull()) {
+                              p.getLevel().dropItem(p, l);
+                          }
+                      }
+                  }
+              }
+
+              private static int slotsCount(PlayerInventory inv) {
+                  return Math.min(inv.getSize(), INV_SLOTS);
+              }
+
+              private static long capacity(PlayerInventory inv, Item ref) {
+                  long cap = 0;
+                  int max = ref.getMaxStackSize();
+                  for (int i = 0; i < slotsCount(inv); i++) {
+                      Item it = inv.getItem(i);
+                      if (it == null || it.isNull()) {
+                          cap += max;
+                      } else if (it.equals(ref, true, true)) {
+                          cap += Math.max(0, max - it.getCount());
+                      }
+                  }
+                  return cap;
+              }
+          }
+          EOF
+
+      - name: Build with Maven
+        run: mvn -B -ntp package
+
+      - name: Upload plugin jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: Shop-plugin
+          path: target/Shop-*.jar
+          if-no-files-found: error
